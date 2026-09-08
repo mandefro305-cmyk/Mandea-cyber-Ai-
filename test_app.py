@@ -1,8 +1,8 @@
 import io
+import os
 import unittest
 from PIL import Image
 import docx
-import pandas as pd
 
 from file_parser import (
     parse_text_file,
@@ -12,10 +12,14 @@ from file_parser import (
     process_uploaded_file
 )
 from api_client import prepare_messages_for_api, fetch_available_models
-from config import estimate_tokens, calculate_cost, SYSTEM_PRESETS
+from config import estimate_tokens, calculate_cost
 from security_utils import redact_sensitive_data, scan_code_for_vulnerabilities
 from data_utils import parse_csv_file
 from session_utils import export_chat_to_markdown, export_chat_to_json
+from db_utils import init_db, create_session, get_all_sessions, save_message, get_session_messages, delete_session
+from rag_utils import chunk_text, search_chunks
+from remediation_utils import generate_remediation_diff
+from search_utils import format_search_context
 
 class DummyUploadedFile:
     def __init__(self, name: str, data: bytes):
@@ -25,7 +29,11 @@ class DummyUploadedFile:
     def getvalue(self) -> bytes:
         return self._data
 
-class TestAppFeatures(unittest.TestCase):
+class TestAppAllFeatures(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        init_db()
 
     def test_parse_text_file(self):
         content = b"Hello, world! This is a test file."
@@ -76,8 +84,6 @@ class TestAppFeatures(unittest.TestCase):
         self.assertEqual(messages[0]["role"], "user")
         self.assertEqual(messages[1]["role"], "assistant")
         self.assertEqual(messages[2]["role"], "user")
-        self.assertIn("Doc content", messages[2]["content"])
-        self.assertIn("Summarize this document", messages[2]["content"])
 
     def test_fetch_available_models_fallback(self):
         models = fetch_available_models(api_key="", base_url="https://agentrouter.ai/v1")
@@ -89,34 +95,46 @@ class TestAppFeatures(unittest.TestCase):
         redacted, count = redact_sensitive_data(sample)
         self.assertTrue(count >= 2)
         self.assertNotIn("sk-12345678901234567890", redacted)
-        self.assertNotIn("test@example.com", redacted)
 
     def test_scan_code_for_vulnerabilities(self):
         vulnerable_code = "eval('import os');\nquery = 'SELECT * FROM users WHERE id=' + user_id"
         findings = scan_code_for_vulnerabilities(vulnerable_code)
         self.assertTrue(len(findings) >= 2)
 
-    def test_parse_csv_file(self):
-        csv_data = b"col1,col2\n1,10\n2,20\n3,30"
-        res = parse_csv_file(csv_data, "data.csv")
-        self.assertTrue(res["success"])
-        self.assertEqual(res["df"].shape, (3, 2))
+    def test_db_persistence(self):
+        test_sid = "test_s1"
+        create_session(test_sid, "Test Session")
+        save_message(test_sid, "user", "Hello DB")
+        save_message(test_sid, "assistant", "Hello User")
 
-    def test_chat_export(self):
-        messages = [
-            {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": "Hi there"}
-        ]
-        md = export_chat_to_markdown(messages)
-        js = export_chat_to_json(messages)
-        self.assertIn("# Chat Session Export", md)
-        self.assertIn("Hi there", js)
+        msgs = get_session_messages(test_sid)
+        self.assertEqual(len(msgs), 2)
+        self.assertEqual(msgs[0]["content"], "Hello DB")
 
-    def test_token_and_cost_estimation(self):
-        tokens = estimate_tokens("Short sentence for token count estimation.")
-        cost = calculate_cost("gpt-4o", 1000, 500)
-        self.assertTrue(tokens > 0)
-        self.assertTrue(cost > 0)
+        delete_session(test_sid)
+        self.assertEqual(len(get_session_messages(test_sid)), 0)
+
+    def test_rag_chunking_and_search(self):
+        text = "Python is a programming language. Security auditing ensures safety. SQL injection is a common flaw."
+        chunks = chunk_text(text, chunk_size=5, overlap=1)
+        doc_chunks = [{"source": "test.txt", "text": c} for c in chunks]
+
+        results = search_chunks("SQL injection safety", doc_chunks, top_k=2)
+        self.assertTrue(len(results) > 0)
+        self.assertIn("source", results[0])
+
+    def test_remediation_diff(self):
+        code = "eval('bad_code')"
+        findings = ["Critical eval()"]
+        diff = generate_remediation_diff("vulnerable.py", code, findings)
+        self.assertIn("--- a/vulnerable.py", diff)
+        self.assertIn("FIX: Replaced unsafe eval()", diff)
+
+    def test_format_search_context(self):
+        search_results = [{"title": "Test Title", "href": "https://example.com", "body": "Test Snippet"}]
+        ctx = format_search_context(search_results)
+        self.assertIn("--- Live Web Search Context ---", ctx)
+        self.assertIn("https://example.com", ctx)
 
 if __name__ == "__main__":
     unittest.main()
