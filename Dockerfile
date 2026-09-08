@@ -18,8 +18,9 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY . .
 
+# Expose default Streamlit port
 EXPOSE 8501
 
 ENV PYTHONUNBUFFERED=1
 
-CMD ["sh", "-c", "streamlit run app.py --server.port=${PORT:-8501} --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false"]
+CMD exec streamlit run app.py --server.port=${PORT:-8501} --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false
