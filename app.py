@@ -379,7 +379,11 @@ if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
                         st.session_state.estimated_cost += cost
 
                     except Exception as e:
-                        st.error(f"Error from AgentRouter API: {str(e)}")
+                        err_msg = str(e)
+                        if "timed out" in err_msg.lower() or "timeout" in err_msg.lower():
+                            st.error(f"Error from AgentRouter API: Request timed out. Please verify that your API key is valid and active, or try selecting a different model or Base API URL (e.g. https://openrouter.ai/api/v1).")
+                        else:
+                            st.error(f"Error from AgentRouter API: {err_msg}")
 
             else: # Side-by-Side Model Comparison
                 col_a, col_b = st.columns(2)
