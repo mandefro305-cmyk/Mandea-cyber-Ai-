@@ -23,7 +23,7 @@ load_dotenv()
 init_db()
 
 st.set_page_config(
-    page_title="Multi-Modal AI Assistant & Security Auditor",
+    page_title="Mâñđ€å Åî",
     page_icon="🤖",
     layout="wide"
 )
@@ -69,7 +69,7 @@ else:
         st.session_state.user_role = "guest"
         st.rerun()
 
-st.title("🤖 Multi-Modal AI Assistant & Security Auditor")
+st.title("🤖 Mâñđ€å Åî")
 st.caption("Powered by AgentRouter API. AST Deep Analysis, Agentic Pipelines, PDF Export, Multi-Model comparison, & RAG.")
 
 # Session State Initializations
