@@ -28,6 +28,92 @@ st.set_page_config(
     layout="wide"
 )
 
+# Custom ChatGPT-like styling
+st.markdown("""
+<style>
+    /* Global Container Padding & Styling */
+    .stApp {
+        background-color: #212121;
+        color: #ececec;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        background-color: #171717;
+        border-right: 1px solid #2f2f2f;
+    }
+
+    /* Main Header Styling */
+    .chat-header {
+        text-align: center;
+        padding: 1.5rem 0 1rem 0;
+    }
+    .chat-title {
+        font-size: 2.2rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #10a37f 0%, #34d399 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.2rem;
+    }
+    .chat-subtitle {
+        color: #b4b4b4;
+        font-size: 0.95rem;
+    }
+
+    /* Suggestion Cards */
+    .suggestion-card {
+        background-color: #2f2f2f;
+        border: 1px solid #424242;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        transition: transform 0.2s, border-color 0.2s;
+    }
+    .suggestion-card:hover {
+        border-color: #10a37f;
+    }
+    .suggestion-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #f3f3f3;
+        margin-bottom: 0.25rem;
+    }
+    .suggestion-desc {
+        font-size: 0.82rem;
+        color: #a0a0a0;
+    }
+
+    /* Input & Buttons */
+    .stTextInput > div > div > input {
+        border-radius: 8px;
+        background-color: #2f2f2f;
+        color: #ffffff;
+        border: 1px solid #424242;
+    }
+    .stButton > button {
+        border-radius: 8px;
+        background-color: #10a37f;
+        color: white;
+        border: none;
+        font-weight: 500;
+    }
+    .stButton > button:hover {
+        background-color: #0e8e6f;
+        color: white;
+    }
+
+    /* Chat Messages */
+    div[data-testid="stChatMessage"] {
+        background-color: transparent;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Authentication Session State
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -69,8 +155,12 @@ else:
         st.session_state.user_role = "guest"
         st.rerun()
 
-st.title("🤖 Mâñđ€å Åî")
-st.caption("Powered by AgentRouter API. AST Deep Analysis, Agentic Pipelines, PDF Export, Multi-Model comparison, & RAG.")
+st.markdown("""
+<div class="chat-header">
+    <div class="chat-title">🤖 Mâñđ€å Åî</div>
+    <div class="chat-subtitle">Powered by AgentRouter API. Multi-Modal Chat, AST Code Security Auditing, RAG & Multi-Agent Workflows</div>
+</div>
+""", unsafe_allow_html=True)
 
 # Session State Initializations
 if "current_session_id" not in st.session_state:
@@ -282,14 +372,45 @@ if st.session_state.messages:
 st.sidebar.metric("Total Estimated Tokens", st.session_state.total_tokens_used)
 st.sidebar.metric("Total Estimated Cost ($)", f"${st.session_state.estimated_cost:.5f}")
 
+# Display Suggestion Prompt Cards when conversation is empty
+if len(st.session_state.messages) == 0 and mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
+    col_c1, col_c2 = st.columns(2)
+    with col_c1:
+        st.markdown("""
+        <div class="suggestion-card">
+            <div class="suggestion-title">🛡️ Security & AST Code Audit</div>
+            <div class="suggestion-desc">Upload Python/source code to scan for OWASP vulnerabilities & AST syntax trees.</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("""
+        <div class="suggestion-card">
+            <div class="suggestion-title">⚖️ Side-by-Side Model Comparison</div>
+            <div class="suggestion-desc">Compare real-time LLM responses from GPT-4o, Claude, DeepSeek, or Llama.</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_c2:
+        st.markdown("""
+        <div class="suggestion-card">
+            <div class="suggestion-title">📚 Document RAG & Web Search</div>
+            <div class="suggestion-desc">Ask questions across uploaded PDFs/documents or enable live web search context.</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("""
+        <div class="suggestion-card">
+            <div class="suggestion-title">🤖 Autonomous Multi-Agent Pipeline</div>
+            <div class="suggestion-desc">Run autonomous multi-agent pipelines for code inspection and patch generation.</div>
+        </div>
+        """, unsafe_allow_html=True)
+
 # Display Chat History
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
+    avatar_icon = "👤" if message["role"] == "user" else "🤖"
+    with st.chat_message(message["role"], avatar=avatar_icon):
         st.markdown(message["content"])
 
 # User Chat Input (for Chat and Comparison modes)
 if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
-    if prompt := st.chat_input("Ask a question, analyze security, inspect documents, or search web..."):
+    if prompt := st.chat_input("Ask anything, analyze security, inspect documents, or search web..."):
         if not api_key:
             st.error("Please enter your AgentRouter API key in the sidebar or set AGENTROUTER_API_KEY environment variable.")
         else:
@@ -301,7 +422,7 @@ if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
                     st.info(f"🛡️ Auto-redacted {r_count} sensitive token(s)/credential(s) from user prompt.")
 
             # Render User Prompt
-            with st.chat_message("user"):
+            with st.chat_message("user", avatar="👤"):
                 st.markdown(prompt_to_send)
 
             st.session_state.messages.append({"role": "user", "content": prompt_to_send})
@@ -354,7 +475,7 @@ if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
             in_tokens = estimate_tokens(str(api_messages))
 
             if mode == "Standard Assistant Chat":
-                with st.chat_message("assistant"):
+                with st.chat_message("assistant", avatar="🤖"):
                     placeholder = st.empty()
                     full_resp = ""
                     try:
