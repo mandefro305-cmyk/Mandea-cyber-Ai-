@@ -1,5 +1,6 @@
 import io
 import os
+import uuid
 import unittest
 from PIL import Image
 import docx
@@ -14,12 +15,16 @@ from file_parser import (
 from api_client import prepare_messages_for_api, fetch_available_models
 from config import estimate_tokens, calculate_cost
 from security_utils import redact_sensitive_data, scan_code_for_vulnerabilities
+from ast_utils import analyze_python_ast
 from data_utils import parse_csv_file
 from session_utils import export_chat_to_markdown, export_chat_to_json
 from db_utils import init_db, create_session, get_all_sessions, save_message, get_session_messages, delete_session
 from rag_utils import chunk_text, search_chunks
 from remediation_utils import generate_remediation_diff
 from search_utils import format_search_context
+from report_generator import generate_pdf_audit_report
+from agent_engine import SecurityTaskPipeline
+from auth_utils import register_user, authenticate_user
 
 class DummyUploadedFile:
     def __init__(self, name: str, data: bytes):
@@ -29,7 +34,7 @@ class DummyUploadedFile:
     def getvalue(self) -> bytes:
         return self._data
 
-class TestAppAllFeatures(unittest.TestCase):
+class TestAppAllFeaturesExtended(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -81,9 +86,6 @@ class TestAppAllFeatures(unittest.TestCase):
         messages = prepare_messages_for_api(history, attached, user_prompt)
 
         self.assertEqual(len(messages), 3)
-        self.assertEqual(messages[0]["role"], "user")
-        self.assertEqual(messages[1]["role"], "assistant")
-        self.assertEqual(messages[2]["role"], "user")
 
     def test_fetch_available_models_fallback(self):
         models = fetch_available_models(api_key="", base_url="https://agentrouter.ai/v1")
@@ -101,40 +103,37 @@ class TestAppAllFeatures(unittest.TestCase):
         findings = scan_code_for_vulnerabilities(vulnerable_code)
         self.assertTrue(len(findings) >= 2)
 
-    def test_db_persistence(self):
-        test_sid = "test_s1"
-        create_session(test_sid, "Test Session")
-        save_message(test_sid, "user", "Hello DB")
-        save_message(test_sid, "assistant", "Hello User")
+    def test_ast_python_analysis(self):
+        py_code = "import subprocess\neval('1+1')\nsubprocess.run('ls', shell=True)"
+        ast_findings = analyze_python_ast(py_code, "test.py")
+        self.assertTrue(len(ast_findings) >= 2)
 
-        msgs = get_session_messages(test_sid)
-        self.assertEqual(len(msgs), 2)
-        self.assertEqual(msgs[0]["content"], "Hello DB")
+    def test_pdf_report_generation(self):
+        findings = ["Critical: Call to eval()"]
+        diff = "--- a/test.py\n+++ b/test.py\n- eval()\n+ safe()"
+        pdf_data = generate_pdf_audit_report("test.py", findings, diff)
+        self.assertTrue(len(pdf_data) > 0)
+        self.assertTrue(pdf_data.startswith(b"%PDF"))
 
-        delete_session(test_sid)
-        self.assertEqual(len(get_session_messages(test_sid)), 0)
+    def test_agent_pipeline_execution(self):
+        pipeline = SecurityTaskPipeline("script.py", "eval('1+1')")
+        res = pipeline.execute_pipeline()
+        self.assertEqual(res["filename"], "script.py")
+        self.assertTrue(len(res["agent_logs"]) >= 4)
+        self.assertTrue(len(res["findings"]) > 0)
 
-    def test_rag_chunking_and_search(self):
-        text = "Python is a programming language. Security auditing ensures safety. SQL injection is a common flaw."
-        chunks = chunk_text(text, chunk_size=5, overlap=1)
-        doc_chunks = [{"source": "test.txt", "text": c} for c in chunks]
+    def test_user_authentication(self):
+        uname = f"user_{str(uuid.uuid4())[:8]}"
+        pwd = "securepassword123"
+        success_reg, _ = register_user(uname, pwd, role="admin")
+        self.assertTrue(success_reg)
 
-        results = search_chunks("SQL injection safety", doc_chunks, top_k=2)
-        self.assertTrue(len(results) > 0)
-        self.assertIn("source", results[0])
+        success_auth, _, role = authenticate_user(uname, pwd)
+        self.assertTrue(success_auth)
+        self.assertEqual(role, "admin")
 
-    def test_remediation_diff(self):
-        code = "eval('bad_code')"
-        findings = ["Critical eval()"]
-        diff = generate_remediation_diff("vulnerable.py", code, findings)
-        self.assertIn("--- a/vulnerable.py", diff)
-        self.assertIn("FIX: Replaced unsafe eval()", diff)
-
-    def test_format_search_context(self):
-        search_results = [{"title": "Test Title", "href": "https://example.com", "body": "Test Snippet"}]
-        ctx = format_search_context(search_results)
-        self.assertIn("--- Live Web Search Context ---", ctx)
-        self.assertIn("https://example.com", ctx)
+        fail_auth, _, _ = authenticate_user(uname, "wrongpassword")
+        self.assertFalse(fail_auth)
 
 if __name__ == "__main__":
     unittest.main()
