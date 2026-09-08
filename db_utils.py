@@ -20,6 +20,12 @@ def init_db():
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
+    # Enable WAL mode for better concurrency and performance
+    try:
+        cursor.execute("PRAGMA journal_mode=WAL;")
+    except Exception:
+        pass
+
     # Sessions table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
@@ -41,10 +47,15 @@ def init_db():
         )
     """)
 
+    # Indexes for fast querying
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, id ASC);")
+
     conn.commit()
     conn.close()
 
 def create_session(session_id: str, title: str = "New Session"):
+    init_db()
     db_path = get_db_path()
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
