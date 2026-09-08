@@ -476,8 +476,6 @@ if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
 
             if mode == "Standard Assistant Chat":
                 with st.chat_message("assistant", avatar="🤖"):
-                    placeholder = st.empty()
-                    full_resp = ""
                     try:
                         client = get_agentrouter_client(api_key, base_url)
                         response = client.chat.completions.create(
@@ -485,12 +483,13 @@ if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
                             messages=api_messages,
                             stream=True
                         )
-                        for chunk in response:
-                            if chunk.choices and chunk.choices[0].delta.content:
-                                c = chunk.choices[0].delta.content
-                                full_resp += c
-                                placeholder.markdown(full_resp + "▌")
-                        placeholder.markdown(full_resp)
+
+                        def stream_gen(res):
+                            for chunk in res:
+                                if chunk.choices and chunk.choices[0].delta.content:
+                                    yield chunk.choices[0].delta.content
+
+                        full_resp = st.write_stream(stream_gen(response))
                         st.session_state.messages.append({"role": "assistant", "content": full_resp})
                         save_message(st.session_state.current_session_id, "assistant", full_resp)
 
@@ -511,33 +510,28 @@ if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
                 resp_a_text = ""
                 resp_b_text = ""
 
+                def make_stream_gen(res):
+                    def gen():
+                        for chunk in res:
+                            if chunk.choices and chunk.choices[0].delta.content:
+                                yield chunk.choices[0].delta.content
+                    return gen()
+
                 with col_a:
                     st.subheader(f"🤖 {model_a}")
-                    ph_a = st.empty()
                     try:
                         client = get_agentrouter_client(api_key, base_url)
                         resp_a = client.chat.completions.create(model=model_a, messages=api_messages, stream=True)
-                        for chunk in resp_a:
-                            if chunk.choices and chunk.choices[0].delta.content:
-                                c = chunk.choices[0].delta.content
-                                resp_a_text += c
-                                ph_a.markdown(resp_a_text + "▌")
-                        ph_a.markdown(resp_a_text)
+                        resp_a_text = st.write_stream(make_stream_gen(resp_a))
                     except Exception as e:
                         st.error(f"Error ({model_a}): {str(e)}")
 
                 with col_b:
                     st.subheader(f"🤖 {model_b}")
-                    ph_b = st.empty()
                     try:
                         client = get_agentrouter_client(api_key, base_url)
                         resp_b = client.chat.completions.create(model=model_b, messages=api_messages, stream=True)
-                        for chunk in resp_b:
-                            if chunk.choices and chunk.choices[0].delta.content:
-                                c = chunk.choices[0].delta.content
-                                resp_b_text += c
-                                ph_b.markdown(resp_b_text + "▌")
-                        ph_b.markdown(resp_b_text)
+                        resp_b_text = st.write_stream(make_stream_gen(resp_b))
                     except Exception as e:
                         st.error(f"Error ({model_b}): {str(e)}")
 
