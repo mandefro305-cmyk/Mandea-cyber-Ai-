@@ -1,5 +1,6 @@
 import os
 import requests
+import streamlit as st
 from openai import OpenAI
 
 def get_agentrouter_client(api_key: str, base_url: str, timeout: float = 120.0):
@@ -16,9 +17,10 @@ def get_agentrouter_client(api_key: str, base_url: str, timeout: float = 120.0):
         max_retries=2
     )
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def fetch_available_models(api_key: str, base_url: str) -> list[str]:
     """
-    Fetches the list of models from AgentRouter / OpenRouter API.
+    Fetches the list of models from AgentRouter / OpenRouter API with 1-hour caching for super fast performance.
     Falls back to a default list if the endpoint is unreachable.
     """
     default_models = [
@@ -37,7 +39,7 @@ def fetch_available_models(api_key: str, base_url: str) -> list[str]:
     try:
         url = f"{base_url.rstrip('/')}/models"
         headers = {"Authorization": f"Bearer {api_key}"}
-        resp = requests.get(url, headers=headers, timeout=5)
+        resp = requests.get(url, headers=headers, timeout=3)
         if resp.status_code == 200:
             data = resp.json()
             if "data" in data and isinstance(data["data"], list):
