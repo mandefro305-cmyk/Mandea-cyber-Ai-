@@ -1,11 +1,12 @@
 import sqlite3
+import os
 import hashlib
 import time
-
-DB_PATH = "assistant_data.db"
+from db_utils import get_db_path
 
 def init_auth_db():
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -26,7 +27,8 @@ def register_user(username: str, password: str, role: str = "user") -> tuple[boo
     if not username.strip() or not password.strip():
         return False, "Username and password cannot be empty."
 
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT username FROM users WHERE username = ?", (username.strip(),))
     if cursor.fetchone():
@@ -43,7 +45,8 @@ def register_user(username: str, password: str, role: str = "user") -> tuple[boo
 def authenticate_user(username: str, password: str) -> tuple[bool, str, str]:
     """Returns (success, message, role)"""
     init_auth_db()
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT password_hash, role FROM users WHERE username = ?", (username.strip(),))
     row = cursor.fetchone()

@@ -1,11 +1,23 @@
 import sqlite3
+import os
 import json
 import time
 
-DB_PATH = "assistant_data.db"
+def get_db_path() -> str:
+    """
+    Returns the SQLite database path.
+    Checks for DATA_DIR environment variable (useful for Railway Persistent Volumes).
+    Defaults to './assistant_data.db'.
+    """
+    data_dir = os.getenv("DATA_DIR", ".").strip()
+    if data_dir and data_dir != ".":
+        os.makedirs(data_dir, exist_ok=True)
+        return os.path.join(data_dir, "assistant_data.db")
+    return "assistant_data.db"
 
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Sessions table
@@ -33,7 +45,8 @@ def init_db():
     conn.close()
 
 def create_session(session_id: str, title: str = "New Session"):
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("INSERT OR REPLACE INTO sessions (id, title, created_at) VALUES (?, ?, ?)",
                    (session_id, title, time.time()))
@@ -42,7 +55,8 @@ def create_session(session_id: str, title: str = "New Session"):
 
 def get_all_sessions() -> list[dict]:
     init_db()
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT id, title, created_at FROM sessions ORDER BY created_at DESC")
     rows = cursor.fetchall()
@@ -51,7 +65,8 @@ def get_all_sessions() -> list[dict]:
 
 def save_message(session_id: str, role: str, content: str):
     init_db()
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("INSERT INTO messages (session_id, role, content, timestamp) VALUES (?, ?, ?, ?)",
                    (session_id, role, content, time.time()))
@@ -60,7 +75,8 @@ def save_message(session_id: str, role: str, content: str):
 
 def get_session_messages(session_id: str) -> list[dict]:
     init_db()
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT role, content FROM messages WHERE session_id = ? ORDER BY id ASC", (session_id,))
     rows = cursor.fetchall()
@@ -68,7 +84,8 @@ def get_session_messages(session_id: str) -> list[dict]:
     return [{"role": r[0], "content": r[1]} for r in rows]
 
 def delete_session(session_id: str):
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
     cursor.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
