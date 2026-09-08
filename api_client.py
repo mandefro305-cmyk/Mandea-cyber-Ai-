@@ -2,16 +2,18 @@ import os
 import requests
 from openai import OpenAI
 
-def get_agentrouter_client(api_key: str, base_url: str):
+def get_agentrouter_client(api_key: str, base_url: str, timeout: float = 120.0):
     """
-    Creates an OpenAI-compatible client for AgentRouter / OpenRouter.
+    Creates an OpenAI-compatible client for AgentRouter / OpenRouter with configurable timeout and retries.
     """
     if not api_key:
         raise ValueError("API key is missing. Please set AGENTROUTER_API_KEY or OPENROUTER_API_KEY in environment or sidebar.")
 
     return OpenAI(
         api_key=api_key,
-        base_url=base_url
+        base_url=base_url,
+        timeout=timeout,
+        max_retries=2
     )
 
 def fetch_available_models(api_key: str, base_url: str) -> list[str]:
