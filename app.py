@@ -28,19 +28,19 @@ st.set_page_config(
     layout="wide"
 )
 
-# Custom ChatGPT-like styling
+# Custom ChatGPT-like styling with Theme Variable fallbacks
 st.markdown("""
 <style>
     /* Global Container Padding & Styling */
     .stApp {
-        background-color: #212121;
-        color: #ececec;
+        background-color: var(--background-color, #212121);
+        color: var(--text-color, #ececec);
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
     /* Sidebar Styling */
     section[data-testid="stSidebar"] {
-        background-color: #171717;
+        background-color: var(--secondary-background-color, #171717);
         border-right: 1px solid #2f2f2f;
     }
 
@@ -308,8 +308,13 @@ if mode == "Multi-Agent Security Pipeline":
     agent_filename = st.text_input("Target Filename", value="script.py")
 
     if st.button("Run Multi-Agent Pipeline"):
-        pipeline = SecurityTaskPipeline(agent_filename, agent_code_input)
-        result = pipeline.execute_pipeline()
+        with st.status("🤖 Multi-Agent Pipeline Execution...", expanded=True) as status:
+            status.write("Phase 1: Input Sanitization & PII Redaction...")
+            pipeline = SecurityTaskPipeline(agent_filename, agent_code_input)
+            status.write("Phase 2: Code Inspection & AST Vulnerability Analysis...")
+            result = pipeline.execute_pipeline()
+            status.write("Phase 3: Remediation Patch Generation...")
+            status.update(label="✅ Multi-Agent Pipeline Completed Successfully!", state="complete", expanded=False)
 
         st.markdown("### 📋 Agent Workflow Logs")
         for log in result["agent_logs"]:
@@ -366,8 +371,11 @@ if st.sidebar.button("Clear / Reset Session Messages"):
 if st.session_state.messages:
     md_export = export_chat_to_markdown(st.session_state.messages)
     json_export = export_chat_to_json(st.session_state.messages)
-    st.sidebar.download_button("📥 Export Chat as Markdown", md_export, file_name="chat_history.md", mime="text/markdown")
-    st.sidebar.download_button("📥 Export Chat as JSON", json_export, file_name="chat_history.json", mime="application/json")
+    col_ex1, col_ex2 = st.sidebar.columns(2)
+    with col_ex1:
+        st.download_button("📥 Export MD", md_export, file_name=f"chat_{st.session_state.current_session_id}.md", mime="text/markdown")
+    with col_ex2:
+        st.download_button("📥 Export JSON", json_export, file_name=f"chat_{st.session_state.current_session_id}.json", mime="application/json")
 
 st.sidebar.metric("Total Estimated Tokens", st.session_state.total_tokens_used)
 st.sidebar.metric("Total Estimated Cost ($)", f"${st.session_state.estimated_cost:.5f}")
@@ -444,20 +452,26 @@ if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
             # Web Search Context Integration
             web_context_str = ""
             if enable_web_search:
-                with st.spinner("🔍 Searching live web..."):
+                with st.status("🔍 Searching live web for context...", expanded=False) as status:
                     search_results = perform_web_search(prompt_to_send)
                     if search_results:
                         web_context_str = format_search_context(search_results)
-                        st.info(f"🌐 Retrieved {len(search_results)} search results.")
+                        status.update(label=f"🌐 Retrieved {len(search_results)} live web search results", state="complete")
+                    else:
+                        status.update(label="🌐 Web search completed (0 results)", state="complete")
 
             # RAG Context Integration
             rag_context_str = ""
             if enable_rag_indexing and document_chunks:
-                top_matches = search_chunks(prompt_to_send, document_chunks, top_k=3)
-                if top_matches:
-                    rag_context_str = "--- Relevant Document Chunks (RAG) ---\n" + "\n".join(
-                        [f"[{m['source']} (Score: {m['score']})]: {m['text']}" for m in top_matches]
-                    )
+                with st.status("📚 Scanning uploaded documents (RAG)...", expanded=False) as status:
+                    top_matches = search_chunks(prompt_to_send, document_chunks, top_k=3)
+                    if top_matches:
+                        rag_context_str = "--- Relevant Document Chunks (RAG) ---\n" + "\n".join(
+                            [f"[{m['source']} (Score: {m['score']})]: {m['text']}" for m in top_matches]
+                        )
+                        status.update(label=f"📄 Matched {len(top_matches)} document chunk(s)", state="complete")
+                    else:
+                        status.update(label="📄 RAG scan completed (0 matches)", state="complete")
 
             # Merge additional context into user prompt for API
             augmented_user_prompt = prompt_to_send

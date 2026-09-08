@@ -16,26 +16,33 @@
 
 ---
 
-## 🚂 Railway Persistent Volume Setup
+## 🚂 Railway Deployment & Persistent Volume Setup
 
-To ensure persistent data storage (such as saved sessions, user logins, and chat history) across container redeployments on Railway:
+### 1. Fix 502 Bad Gateway / Network Port Configuration
+If Railway shows `502 Bad Gateway` on deployment:
+1. Open your service settings on **Railway.app**.
+2. Go to **Settings** -> **Networking** -> **PORT**.
+3. Ensure the Port setting is empty (so Railway automatically sets `PORT`) or set explicitly to:
+   ```text
+   8501
+   ```
+4. Under **Healthcheck Path**, set the healthcheck path to:
+   ```text
+   /_stcore/health
+   ```
 
-### 1. Add a Volume in Railway
+### 2. Add a Persistent Volume on Railway
+To ensure persistent data storage (saved sessions, user logins, chat history) across container redeployments:
 1. Open your project on **[Railway.app](https://railway.app)**.
-2. Click on your project service canvas or select **+ New** -> **Volume**.
-3. Select your service (`Mandea-cyber-Ai-` or your deployed service name) to attach the volume.
-4. Set the **Mount Path** to:
+2. Select **+ New** -> **Volume** and attach it to your service.
+3. Set the **Mount Path** to:
    ```text
    /app/data
    ```
-
-### 2. Configure Environment Variables
-In your Railway Service Settings under **Variables**, set the following environment variable:
-```env
-DATA_DIR=/app/data
-```
-
-With `DATA_DIR=/app/data`, the application stores the SQLite database (`assistant_data.db`) at `/app/data/assistant_data.db`, ensuring that chat histories, registered user accounts, and saved sessions persist across deployments and container restarts.
+4. Set the environment variable in Railway Service Variables:
+   ```env
+   DATA_DIR=/app/data
+   ```
 
 ---
 
@@ -46,6 +53,7 @@ With `DATA_DIR=/app/data`, the application stores the SQLite database (`assistan
 | `DATA_DIR` | Path to directory where SQLite DB is stored | `/app/data` (for Railway Volume) or `.` |
 | `AGENTROUTER_API_KEY` | AgentRouter or OpenRouter API key | `sk-or-...` |
 | `AGENTROUTER_BASE_URL` | API Base URL | `https://agentrouter.ai/v1` |
+| `PORT` | Dynamic HTTP port provided by Railway | `8501` |
 
 ---
 
