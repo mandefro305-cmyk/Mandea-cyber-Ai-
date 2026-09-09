@@ -20,17 +20,37 @@ def get_agentrouter_client(api_key: str, base_url: str, timeout: float = 60.0):
 
 def stream_response_generator(response):
     """
-    Generator that safely extracts text deltas from API streaming response chunks.
+    Generator that safely extracts text deltas and reasoning content from API streaming response chunks.
+    Handles both object attribute and dictionary representations.
     """
     try:
         for chunk in response:
-            if hasattr(chunk, 'choices') and chunk.choices:
-                choice = chunk.choices[0]
+            # Handle object vs dict representations of chunk
+            choices = getattr(chunk, 'choices', None)
+            if choices is None and isinstance(chunk, dict):
+                choices = chunk.get('choices', [])
+
+            if choices:
+                choice = choices[0]
                 delta = getattr(choice, 'delta', None)
+                if delta is None and isinstance(choice, dict):
+                    delta = choice.get('delta', {})
+
                 if delta:
+                    # Content extraction
                     content = getattr(delta, 'content', None)
+                    if content is None and isinstance(delta, dict):
+                        content = delta.get('content')
+
+                    # Reasoning content extraction (for DeepSeek R1 / Reasoning models)
+                    reasoning_content = getattr(delta, 'reasoning_content', None)
+                    if reasoning_content is None and isinstance(delta, dict):
+                        reasoning_content = delta.get('reasoning_content')
+
                     if content:
                         yield content
+                    elif reasoning_content:
+                        yield reasoning_content
     except Exception as e:
         yield f"\n\n⚠️ *[Stream Error]: {str(e)}*"
 

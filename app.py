@@ -452,13 +452,29 @@ if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
                     try:
                         from api_client import stream_response_generator
                         client = get_agentrouter_client(api_key, base_url)
-                        response = client.chat.completions.create(
-                            model=model_to_use,
-                            messages=api_messages,
-                            stream=True
-                        )
 
-                        full_resp = st.write_stream(stream_response_generator(response))
+                        full_resp = ""
+                        try:
+                            response = client.chat.completions.create(
+                                model=model_to_use,
+                                messages=api_messages,
+                                stream=True
+                            )
+                            full_resp = st.write_stream(stream_response_generator(response))
+                        except Exception:
+                            full_resp = ""
+
+                        # Fallback to non-streaming request if stream is empty or fails
+                        if not full_resp:
+                            fallback_resp = client.chat.completions.create(
+                                model=model_to_use,
+                                messages=api_messages,
+                                stream=False
+                            )
+                            if fallback_resp.choices and fallback_resp.choices[0].message.content:
+                                full_resp = fallback_resp.choices[0].message.content
+                                st.markdown(full_resp)
+
                         if full_resp:
                             st.session_state.messages.append({"role": "assistant", "content": full_resp})
                             save_message(st.session_state.current_session_id, "assistant", full_resp)
@@ -468,11 +484,11 @@ if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
                             st.session_state.total_tokens_used += (in_tokens + out_tokens)
                             st.session_state.estimated_cost += cost
                         else:
-                            st.error("The API returned an empty response. Please verify model selection or API endpoint configuration.")
+                            st.error(f"The API endpoint ({base_url}) returned an empty response for model `{model_to_use}`. Please check model availability or try selecting `gpt-4o` or `claude-3-5-sonnet`.")
 
                     except Exception as e:
                         err_msg = str(e)
-                        st.error(f"Error from API: {err_msg}")
+                        st.error(f"Error from API ({base_url}): {err_msg}")
 
             else:  # Side-by-Side Model Comparison
                 col_a, col_b = st.columns(2)
