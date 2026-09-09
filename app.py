@@ -450,7 +450,7 @@ if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
             if mode == "Standard Assistant Chat":
                 with st.chat_message("assistant", avatar="🤖"):
                     try:
-                        from api_client import stream_response_generator
+                        from api_client import stream_response_generator, extract_response_text
                         client = get_agentrouter_client(api_key, base_url)
 
                         full_resp = ""
@@ -471,8 +471,8 @@ if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
                                 messages=api_messages,
                                 stream=False
                             )
-                            if fallback_resp.choices and fallback_resp.choices[0].message.content:
-                                full_resp = fallback_resp.choices[0].message.content
+                            full_resp = extract_response_text(fallback_resp)
+                            if full_resp:
                                 st.markdown(full_resp)
 
                         if full_resp:
