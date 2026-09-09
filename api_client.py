@@ -113,17 +113,20 @@ def stream_response_generator(response):
 def fetch_available_models(api_key: str, base_url: str) -> list[str]:
     """
     Fetches the list of models from AgentRouter / OpenRouter API with 1-hour caching.
-    Falls back to a default list if unreachable.
+    Falls back to a default list containing Agent Router specific models if unreachable.
     """
     default_models = [
+        "glm-5.3",
+        "deepseek-v4-flash",
+        "claude-opus-5",
+        "claude-opus-4-8",
+        "gpt-5.6-sol",
+        "claude-fable-5",
         "gpt-4o",
         "gpt-4o-mini",
         "claude-3-5-sonnet",
         "claude-3-haiku",
-        "gemini-1.5-pro",
-        "gemini-1.5-flash",
-        "deepseek/deepseek-chat",
-        "meta-llama/llama-3.1-70b-instruct"
+        "deepseek/deepseek-chat"
     ]
     if not api_key:
         return default_models
