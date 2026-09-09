@@ -41,7 +41,7 @@ def get_agentrouter_client(api_key: str, base_url: str = "", timeout: float = 15
     clean_base_url = resolve_base_url(api_key, base_url)
     default_headers = {
         "HTTP-Referer": "https://mandea-ai.railway.app",
-        "X-Title": "Mâñđ€å Åî"
+        "X-Title": "Mandea AI"
     }
     return OpenAI(
         api_key=api_key,
