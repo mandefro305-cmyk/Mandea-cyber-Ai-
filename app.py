@@ -195,16 +195,16 @@ with st.sidebar:
     # 3. Mode & Settings Expander (Keeps API Key masked/secure)
     with st.expander("⚙️ Settings & System Persona"):
         env_api_key = os.getenv("AGENTROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY") or ""
-        default_url = os.getenv("AGENTROUTER_BASE_URL") or "https://openrouter.ai/api/v1"
+        default_url = os.getenv("AGENTROUTER_BASE_URL") or ""
 
         # Mask API key using password type and placeholder if env is set
         api_key = st.text_input(
             "API Key",
             value=env_api_key,
             type="password",
-            help="Your AgentRouter / OpenRouter API Key"
+            help="Your AgentRouter / OpenRouter / OpenAI API Key"
         )
-        base_url = st.text_input("Base API URL", value=default_url)
+        base_url = st.text_input("Base API URL (Optional)", value=default_url, placeholder="Auto-detected if left empty")
 
         selected_preset_name = st.selectbox("System Persona", list(SYSTEM_PRESETS.keys()), index=0)
         system_prompt_text = st.text_area("System Prompt", value=SYSTEM_PRESETS[selected_preset_name], height=70)
