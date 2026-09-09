@@ -12,7 +12,7 @@ from file_parser import (
     encode_image_to_base64,
     process_uploaded_file
 )
-from api_client import prepare_messages_for_api, fetch_available_models
+from api_client import prepare_messages_for_api, fetch_available_models, is_html_response, extract_response_text
 from config import estimate_tokens, calculate_cost
 from security_utils import redact_sensitive_data, scan_code_for_vulnerabilities
 from ast_utils import analyze_python_ast
@@ -91,6 +91,12 @@ class TestAppAllFeaturesExtended(unittest.TestCase):
         models = fetch_available_models(api_key="", base_url="https://agentrouter.ai/v1")
         self.assertTrue(len(models) > 0)
         self.assertIn("gpt-4o", models)
+
+    def test_html_response_filter(self):
+        html_page = "<!doctype html><html lang='zh'><head><title>Agent Router</title></head><body>WAF</body></html>"
+        self.assertTrue(is_html_response(html_page))
+        self.assertEqual(extract_response_text(html_page), "")
+        self.assertFalse(is_html_response("Hello, I am an AI model."))
 
     def test_redact_sensitive_data(self):
         sample = "My api_key='sk-12345678901234567890' and email test@example.com"

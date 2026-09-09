@@ -18,45 +18,66 @@ def get_agentrouter_client(api_key: str, base_url: str, timeout: float = 60.0):
         max_retries=2
     )
 
+def is_html_response(text: str) -> bool:
+    """
+    Checks if a given string response is an HTML page (e.g. WAF block page or web portal) rather than valid LLM output.
+    """
+    if not text or not isinstance(text, str):
+        return False
+    lower = text.strip().lower()
+    return lower.startswith("<!doctype") or lower.startswith("<html") or "<head>" in lower or "<body" in lower
+
 def extract_response_text(resp_obj) -> str:
     """
     Safely extracts response string from various response formats (OpenAI object, dict, string).
+    Detects and rejects HTML WAF/portal responses.
     """
+    res_text = ""
     if isinstance(resp_obj, str):
-        return resp_obj
-
-    if isinstance(resp_obj, dict):
+        res_text = resp_obj
+    elif isinstance(resp_obj, dict):
         choices = resp_obj.get('choices', [])
         if choices and isinstance(choices[0], dict):
             msg = choices[0].get('message', {})
             if isinstance(msg, dict):
-                return msg.get('content', '') or msg.get('reasoning_content', '')
+                res_text = msg.get('content', '') or msg.get('reasoning_content', '')
             elif isinstance(msg, str):
-                return msg
-        return resp_obj.get('content', '')
-
-    if hasattr(resp_obj, 'choices') and resp_obj.choices:
+                res_text = msg
+        else:
+            res_text = resp_obj.get('content', '')
+    elif hasattr(resp_obj, 'choices') and resp_obj.choices:
         choice = resp_obj.choices[0]
         msg = getattr(choice, 'message', None)
         if msg:
             content = getattr(msg, 'content', None)
             reasoning = getattr(msg, 'reasoning_content', None)
-            return content or reasoning or ""
+            res_text = content or reasoning or ""
+    else:
+        res_text = str(resp_obj) if resp_obj is not None else ""
 
-    return str(resp_obj) if resp_obj is not None else ""
+    if is_html_response(res_text):
+        return ""
+
+    return res_text
 
 def stream_response_generator(response):
     """
     Generator that safely extracts text deltas and reasoning content from API streaming response chunks.
-    Handles raw strings, dictionaries, and OpenAI response objects.
+    Detects HTML pages returned by web servers/WAFs and handles them gracefully.
     """
     try:
         if isinstance(response, str):
-            yield response
+            if is_html_response(response):
+                yield "⚠️ **API Error:** The selected Base API URL returned a Web/WAF HTML page instead of an API response. Please verify your Base API URL (e.g. `https://agentrouter.ai/v1` or `https://openrouter.ai/api/v1`) and API Key."
+            else:
+                yield response
             return
 
         for chunk in response:
             if isinstance(chunk, str):
+                if is_html_response(chunk):
+                    yield "⚠️ **API Error:** Received an HTML response page from the API gateway. Please check your Base API URL and credentials."
+                    return
                 yield chunk
                 continue
 
@@ -79,10 +100,12 @@ def stream_response_generator(response):
                     if reasoning_content is None and isinstance(delta, dict):
                         reasoning_content = delta.get('reasoning_content')
 
-                    if content:
-                        yield content
-                    elif reasoning_content:
-                        yield reasoning_content
+                    target_text = content or reasoning_content
+                    if target_text:
+                        if is_html_response(target_text):
+                            yield "⚠️ **API Error:** The server returned an HTML error page instead of text."
+                            return
+                        yield target_text
     except Exception as e:
         yield f"\n\n⚠️ *[Stream Error]: {str(e)}*"
 
