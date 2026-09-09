@@ -18,14 +18,48 @@ def get_agentrouter_client(api_key: str, base_url: str, timeout: float = 60.0):
         max_retries=2
     )
 
+def extract_response_text(resp_obj) -> str:
+    """
+    Safely extracts response string from various response formats (OpenAI object, dict, string).
+    """
+    if isinstance(resp_obj, str):
+        return resp_obj
+
+    if isinstance(resp_obj, dict):
+        choices = resp_obj.get('choices', [])
+        if choices and isinstance(choices[0], dict):
+            msg = choices[0].get('message', {})
+            if isinstance(msg, dict):
+                return msg.get('content', '') or msg.get('reasoning_content', '')
+            elif isinstance(msg, str):
+                return msg
+        return resp_obj.get('content', '')
+
+    if hasattr(resp_obj, 'choices') and resp_obj.choices:
+        choice = resp_obj.choices[0]
+        msg = getattr(choice, 'message', None)
+        if msg:
+            content = getattr(msg, 'content', None)
+            reasoning = getattr(msg, 'reasoning_content', None)
+            return content or reasoning or ""
+
+    return str(resp_obj) if resp_obj is not None else ""
+
 def stream_response_generator(response):
     """
     Generator that safely extracts text deltas and reasoning content from API streaming response chunks.
-    Handles both object attribute and dictionary representations.
+    Handles raw strings, dictionaries, and OpenAI response objects.
     """
     try:
+        if isinstance(response, str):
+            yield response
+            return
+
         for chunk in response:
-            # Handle object vs dict representations of chunk
+            if isinstance(chunk, str):
+                yield chunk
+                continue
+
             choices = getattr(chunk, 'choices', None)
             if choices is None and isinstance(chunk, dict):
                 choices = chunk.get('choices', [])
@@ -37,12 +71,10 @@ def stream_response_generator(response):
                     delta = choice.get('delta', {})
 
                 if delta:
-                    # Content extraction
                     content = getattr(delta, 'content', None)
                     if content is None and isinstance(delta, dict):
                         content = delta.get('content')
 
-                    # Reasoning content extraction (for DeepSeek R1 / Reasoning models)
                     reasoning_content = getattr(delta, 'reasoning_content', None)
                     if reasoning_content is None and isinstance(delta, dict):
                         reasoning_content = delta.get('reasoning_content')
