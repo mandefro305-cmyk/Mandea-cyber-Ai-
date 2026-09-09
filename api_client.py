@@ -39,9 +39,14 @@ def get_agentrouter_client(api_key: str, base_url: str = "", timeout: float = 15
         raise ValueError("API key is missing. Please set AGENTROUTER_API_KEY or OPENROUTER_API_KEY in environment or sidebar.")
 
     clean_base_url = resolve_base_url(api_key, base_url)
+    default_headers = {
+        "HTTP-Referer": "https://mandea-ai.railway.app",
+        "X-Title": "Mâñđ€å Åî"
+    }
     return OpenAI(
         api_key=api_key,
         base_url=clean_base_url,
+        default_headers=default_headers,
         timeout=timeout,
         max_retries=1
     )
