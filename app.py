@@ -488,19 +488,41 @@ if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
 
                     except Exception as e:
                         err_msg = str(e)
-                        if "unauthorized_client_error" in err_msg or "UNAUTHENTICATED" in err_msg or "401" in err_msg:
-                            st.error(
-                                f"❌ **API Authorization Error (401)** from `{base_url}`:\n\n"
-                                f"`{err_msg}`\n\n"
-                                "💡 **How to fix this:**\n"
-                                "1. Verify your API Key in Settings sidebar. Your API key must be generated directly from the console of your provider (e.g. [AgentRouter Console](https://agentrouter.org) or [OpenRouter Keys](https://openrouter.ai/keys)).\n"
-                                "2. Make sure your account has sufficient balance/credits.\n"
-                                "3. If using OpenRouter key (`sk-or-v1-...`), clear the **Base API URL** field in Settings so it auto-routes to OpenRouter."
-                            )
-                        elif "timed out" in err_msg.lower() or "timeout" in err_msg.lower():
-                            st.error(f"⚠️ Connection timed out connecting to `{base_url}`. Please verify that the host is reachable or change the Base API URL in Settings to `https://openrouter.ai/api/v1`.")
-                        else:
-                            st.error(f"Error from API (`{base_url}`): {err_msg}")
+                        fallback_succeeded = False
+
+                        # If agentrouter.org returned a 401 or unauthorized_client_error, try automatic fallback to OpenRouter
+                        if ("unauthorized_client_error" in err_msg or "UNAUTHENTICATED" in err_msg or "401" in err_msg) and "agentrouter.org" in (base_url or ""):
+                            st.info("🔄 `agentrouter.org` rejected key or client. Attempting automatic fallback via OpenRouter endpoint...")
+                            try:
+                                fallback_url = "https://openrouter.ai/api/v1"
+                                fb_client = get_agentrouter_client(api_key, fallback_url)
+                                fb_resp = fb_client.chat.completions.create(
+                                    model="gpt-4o-mini" if "glm" in model_to_use else model_to_use,
+                                    messages=api_messages,
+                                    stream=False
+                                )
+                                full_resp = extract_response_text(fb_resp)
+                                if full_resp:
+                                    st.markdown(full_resp)
+                                    st.session_state.messages.append({"role": "assistant", "content": full_resp})
+                                    save_message(st.session_state.current_session_id, "assistant", full_resp)
+                                    fallback_succeeded = True
+                            except Exception as fb_err:
+                                err_msg = f"{err_msg} | Fallback Error: {str(fb_err)}"
+
+                        if not fallback_succeeded:
+                            if "unauthorized_client_error" in err_msg or "UNAUTHENTICATED" in err_msg or "401" in err_msg:
+                                st.error(
+                                    f"❌ **API Authorization Error (401)**:\n\n"
+                                    f"`{err_msg}`\n\n"
+                                    "💡 **How to resolve:**\n"
+                                    "1. Clear the **Base API URL** input field in the Settings sidebar so it auto-selects `https://openrouter.ai/api/v1`.\n"
+                                    "2. Ensure your API Key is valid and active on [OpenRouter Keys](https://openrouter.ai/keys) or [AgentRouter Console](https://agentrouter.org)."
+                                )
+                            elif "timed out" in err_msg.lower() or "timeout" in err_msg.lower():
+                                st.error(f"⚠️ Connection timed out connecting to `{base_url}`. Please verify that the host is reachable or change the Base API URL in Settings to `https://openrouter.ai/api/v1`.")
+                            else:
+                                st.error(f"Error from API (`{base_url}`): {err_msg}")
 
             else:  # Side-by-Side Model Comparison
                 col_a, col_b = st.columns(2)
