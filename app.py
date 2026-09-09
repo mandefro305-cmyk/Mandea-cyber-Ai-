@@ -488,7 +488,16 @@ if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
 
                     except Exception as e:
                         err_msg = str(e)
-                        if "timed out" in err_msg.lower() or "timeout" in err_msg.lower():
+                        if "unauthorized_client_error" in err_msg or "UNAUTHENTICATED" in err_msg or "401" in err_msg:
+                            st.error(
+                                f"❌ **API Authorization Error (401)** from `{base_url}`:\n\n"
+                                f"`{err_msg}`\n\n"
+                                "💡 **How to fix this:**\n"
+                                "1. Verify your API Key in Settings sidebar. Your API key must be generated directly from the console of your provider (e.g. [AgentRouter Console](https://agentrouter.org) or [OpenRouter Keys](https://openrouter.ai/keys)).\n"
+                                "2. Make sure your account has sufficient balance/credits.\n"
+                                "3. If using OpenRouter key (`sk-or-v1-...`), clear the **Base API URL** field in Settings so it auto-routes to OpenRouter."
+                            )
+                        elif "timed out" in err_msg.lower() or "timeout" in err_msg.lower():
                             st.error(f"⚠️ Connection timed out connecting to `{base_url}`. Please verify that the host is reachable or change the Base API URL in Settings to `https://openrouter.ai/api/v1`.")
                         else:
                             st.error(f"Error from API (`{base_url}`): {err_msg}")
