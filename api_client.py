@@ -3,14 +3,42 @@ import requests
 import streamlit as st
 from openai import OpenAI
 
-def get_agentrouter_client(api_key: str, base_url: str, timeout: float = 15.0):
+def resolve_base_url(api_key: str, provided_base_url: str = "") -> str:
+    """
+    Resolves the appropriate Base API URL automatically based on the provided API key format if no explicit base URL is provided.
+    """
+    if provided_base_url and provided_base_url.strip():
+        url = provided_base_url.strip().rstrip("/")
+        # If user typed just host like agentrouter.org, append /v1
+        if url.startswith("http://") or url.startswith("https://"):
+            if not url.endswith("/v1") and not url.endswith("/api/v1"):
+                if "openrouter" in url:
+                    url = f"{url}/api/v1"
+                else:
+                    url = f"{url}/v1"
+        return url
+
+    # Automatic detection by API key prefix
+    clean_key = (api_key or "").strip()
+    if clean_key.startswith("sk-or-v1-"):
+        return "https://openrouter.ai/api/v1"
+    elif clean_key.startswith("sk-") and not clean_key.startswith("sk-or-"):
+        return "https://api.openai.com/v1"
+
+    env_url = os.getenv("AGENTROUTER_BASE_URL") or os.getenv("OPENROUTER_BASE_URL")
+    if env_url:
+        return env_url.rstrip("/")
+
+    return "https://openrouter.ai/api/v1"
+
+def get_agentrouter_client(api_key: str, base_url: str = "", timeout: float = 15.0):
     """
     Creates an OpenAI-compatible client for AgentRouter / OpenRouter with configurable timeout and retries.
     """
     if not api_key:
         raise ValueError("API key is missing. Please set AGENTROUTER_API_KEY or OPENROUTER_API_KEY in environment or sidebar.")
 
-    clean_base_url = base_url.rstrip("/") if base_url else "https://openrouter.ai/api/v1"
+    clean_base_url = resolve_base_url(api_key, base_url)
     return OpenAI(
         api_key=api_key,
         base_url=clean_base_url,
@@ -110,7 +138,7 @@ def stream_response_generator(response):
         yield f"\n\n⚠️ *[Stream Error]: {str(e)}*"
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_available_models(api_key: str, base_url: str) -> list[str]:
+def fetch_available_models(api_key: str, base_url: str = "") -> list[str]:
     """
     Fetches the list of models from AgentRouter / OpenRouter API with 1-hour caching.
     Falls back to a default list containing Agent Router specific models if unreachable.
@@ -131,8 +159,9 @@ def fetch_available_models(api_key: str, base_url: str) -> list[str]:
     if not api_key:
         return default_models
 
+    resolved_url = resolve_base_url(api_key, base_url)
     try:
-        clean_url = f"{base_url.rstrip('/')}/models"
+        clean_url = f"{resolved_url}/models"
         headers = {"Authorization": f"Bearer {api_key}"}
         resp = requests.get(clean_url, headers=headers, timeout=3)
         if resp.status_code == 200:
