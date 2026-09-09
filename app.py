@@ -195,7 +195,7 @@ with st.sidebar:
     # 3. Mode & Settings Expander (Keeps API Key masked/secure)
     with st.expander("⚙️ Settings & System Persona"):
         env_api_key = os.getenv("AGENTROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY") or ""
-        env_base_url = os.getenv("AGENTROUTER_BASE_URL", "https://agentrouter.ai/v1")
+        default_url = os.getenv("AGENTROUTER_BASE_URL") or "https://openrouter.ai/api/v1"
 
         # Mask API key using password type and placeholder if env is set
         api_key = st.text_input(
@@ -204,7 +204,7 @@ with st.sidebar:
             type="password",
             help="Your AgentRouter / OpenRouter API Key"
         )
-        base_url = st.text_input("Base API URL", value=env_base_url)
+        base_url = st.text_input("Base API URL", value=default_url)
 
         selected_preset_name = st.selectbox("System Persona", list(SYSTEM_PRESETS.keys()), index=0)
         system_prompt_text = st.text_area("System Prompt", value=SYSTEM_PRESETS[selected_preset_name], height=70)
@@ -484,11 +484,14 @@ if mode in ["Standard Assistant Chat", "Side-by-Side Model Comparison"]:
                             st.session_state.total_tokens_used += (in_tokens + out_tokens)
                             st.session_state.estimated_cost += cost
                         else:
-                            st.error(f"The API endpoint ({base_url}) returned an empty response for model `{model_to_use}`. Please check model availability or try selecting `gpt-4o` or `claude-3-5-sonnet`.")
+                            st.error(f"The API endpoint `{base_url}` returned no response for model `{model_to_use}`. Please check your API key or try switching the Base API URL to `https://openrouter.ai/api/v1` in Settings.")
 
                     except Exception as e:
                         err_msg = str(e)
-                        st.error(f"Error from API ({base_url}): {err_msg}")
+                        if "timed out" in err_msg.lower() or "timeout" in err_msg.lower():
+                            st.error(f"⚠️ Connection timed out connecting to `{base_url}`. Please verify that the host is reachable or change the Base API URL in Settings to `https://openrouter.ai/api/v1`.")
+                        else:
+                            st.error(f"Error from API (`{base_url}`): {err_msg}")
 
             else:  # Side-by-Side Model Comparison
                 col_a, col_b = st.columns(2)

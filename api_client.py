@@ -3,19 +3,19 @@ import requests
 import streamlit as st
 from openai import OpenAI
 
-def get_agentrouter_client(api_key: str, base_url: str, timeout: float = 60.0):
+def get_agentrouter_client(api_key: str, base_url: str, timeout: float = 15.0):
     """
     Creates an OpenAI-compatible client for AgentRouter / OpenRouter with configurable timeout and retries.
     """
     if not api_key:
         raise ValueError("API key is missing. Please set AGENTROUTER_API_KEY or OPENROUTER_API_KEY in environment or sidebar.")
 
-    clean_base_url = base_url.rstrip("/") if base_url else "https://agentrouter.ai/v1"
+    clean_base_url = base_url.rstrip("/") if base_url else "https://openrouter.ai/api/v1"
     return OpenAI(
         api_key=api_key,
         base_url=clean_base_url,
         timeout=timeout,
-        max_retries=2
+        max_retries=1
     )
 
 def is_html_response(text: str) -> bool:
